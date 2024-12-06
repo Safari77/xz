@@ -984,6 +984,9 @@ io_open_dest(file_pair *pair)
 static bool
 io_close_dest(file_pair *pair, bool success)
 {
+	bool fsync_ok = false;
+	int ret;
+
 #ifndef TUKLIB_DOSLIKE
 	// If io_open_dest() has disabled O_APPEND, restore it here.
 	if (restore_stdout_flags) {
@@ -1003,10 +1006,19 @@ io_close_dest(file_pair *pair, bool success)
 	if (pair->dest_fd == -1 || pair->dest_fd == STDOUT_FILENO)
 		return false;
 
-	if (close(pair->dest_fd)) {
-		message_error(_("%s: Closing the file failed: %s"),
+	do {
+		ret = fsync(pair->dest_fd);
+	} while ((ret == -1) && (errno == EINTR));
+	fsync_ok = ((ret == 0) || (errno == EINVAL));
+	if (!fsync_ok) {
+		message_error(_("%s: Fsync'ing the file failed: %s"),
 				pair->dest_name, strerror(errno));
-
+	}
+	if (close(pair->dest_fd) || !fsync_ok) {
+		if (fsync_ok) {
+			message_error(_("%s: Closing the file failed: %s"),
+					pair->dest_name, strerror(errno));
+		}
 		// Closing destination file failed, so we cannot trust its
 		// contents. Get rid of junk:
 		io_unlink(pair->dest_name, &pair->dest_st);
