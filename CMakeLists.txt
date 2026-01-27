@@ -77,7 +77,7 @@
 #
 #############################################################################
 
-cmake_minimum_required(VERSION 3.20...3.31 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20...4.2 FATAL_ERROR)
 
 include(CMakePushCheckState)
 include(CheckIncludeFile)
@@ -449,6 +449,7 @@ if(CMAKE_C_COMPILER_ID MATCHES GNU|Clang)
                 -Wdocumentation
                 -Wduplicate-enum
                 -Wempty-translation-unit
+                -Wextra-semi-stmt
                 -Wflexible-array-extensions
                 -Wmissing-variable-declarations
                 -Wnewline-eof
