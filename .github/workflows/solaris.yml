@@ -4,12 +4,11 @@ name: Solaris
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: [ master, ci_run ]
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   Solaris:
@@ -17,10 +16,10 @@ jobs:
     timeout-minutes: 10
     name: Solaris
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Test in Solaris
-        uses: vmactions/solaris-vm@0a231b94365d1911cf62097ef342f6b30d95598f #v1.3.2
+        uses: vmactions/solaris-vm@v1
         with:
           release: 11.4-gcc
           usesh: true

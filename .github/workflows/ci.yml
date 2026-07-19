@@ -11,14 +11,13 @@ name: CI
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: [ master, ci_run ]
 
   # Allows running workflow manually
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   POSIX:
@@ -29,7 +28,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       ########################
       # Install Dependencies #

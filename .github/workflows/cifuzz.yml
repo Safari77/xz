@@ -10,10 +10,11 @@ name: CIFuzz
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, ci_run ]
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   CIFuzz:

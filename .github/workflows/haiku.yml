@@ -4,12 +4,11 @@ name: Haiku
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: [ master, ci_run ]
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   Haiku:
@@ -17,11 +16,11 @@ jobs:
     timeout-minutes: 10
     name: Haiku
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Test in Haiku
         id: test
-        uses: vmactions/haiku-vm@dd2b1b3b180e8e1eac82f5c209485d376e4f48c0 #v1.0.7
+        uses: vmactions/haiku-vm@v1
         with:
           usesh: true
           prepare: >

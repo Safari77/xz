@@ -4,12 +4,11 @@ name: FreeBSD
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: [ master, ci_run ]
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   FreeBSD:
@@ -34,10 +33,10 @@ jobs:
     name: FreeBSD
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Test in FreeBSD
-        uses: vmactions/freebsd-vm@4807432c7cab1c3f97688665332c0b932062d31f #v1.4.3
+        uses: vmactions/freebsd-vm@v1
         with:
           release: ${{ matrix.release }}
           arch: ${{ matrix.arch }}
