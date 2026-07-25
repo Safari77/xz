@@ -1175,6 +1175,17 @@ test_lzma_index_iter_locate(void)
 			LZMA_STREAM_HEADER_SIZE + group_multiple * 8);
 	assert_uint_eq(iter.block.uncompressed_file_offset, 0);
 
+	lzma_index *idx2 = lzma_index_init(NULL);
+	assert_true(idx != NULL);
+	assert_lzma_ret(lzma_index_append(idx2, NULL, 16, 1), LZMA_OK);
+	assert_lzma_ret(lzma_index_cat(idx, idx2, NULL), LZMA_OK);
+	assert_false(lzma_index_iter_locate(&iter, 0));
+	assert_uint_eq(iter.block.total_size, 16);
+	assert_uint_eq(iter.block.uncompressed_size, 1);
+	assert_uint_eq(iter.block.compressed_file_offset,
+			LZMA_STREAM_HEADER_SIZE + group_multiple * 8);
+	assert_uint_eq(iter.block.uncompressed_file_offset, 0);
+
 	lzma_index_end(idx, NULL);
 }
 
@@ -1612,6 +1623,53 @@ test_lzma_index_decoder(void)
 
 
 static void
+test_lzma_index_decoder_memusage(void)
+{
+#if !defined(HAVE_ENCODERS) || !defined(HAVE_DECODERS)
+	assert_skip("Encoder or decoder support disabled");
+#else
+	assert_uint(decode_buffer_size, >, 20);
+
+	lzma_stream strm = LZMA_STREAM_INIT;
+	lzma_index *idx = NULL;
+	assert_lzma_ret(lzma_index_decoder(&strm, &idx, MEMLIMIT), LZMA_OK);
+
+	// Nothing decoded yet.
+	assert_uint(lzma_memusage(&strm), <, 1000);
+
+	const size_t step = 5;
+	size_t remaining = decode_buffer_size;
+	strm.next_in = decode_buffer;
+	strm.avail_in = step;
+	remaining -= strm.avail_in;
+
+	uint64_t memused = 0;
+
+	while (true) {
+		lzma_ret ret = lzma_code(&strm, LZMA_RUN);
+		if (ret == LZMA_STREAM_END)
+			break;
+
+		assert_lzma_ret(ret, LZMA_OK);
+		assert_uint_eq(strm.avail_in, 0);
+		strm.avail_in = my_min(remaining, step);
+		remaining -= strm.avail_in;
+
+		if (memused == 0) {
+			memused = lzma_memusage(&strm);
+			assert_uint(memused, >, 100);
+		} else {
+			assert_uint_eq(lzma_memusage(&strm), memused);
+		}
+	}
+
+	lzma_index_end(idx, NULL);
+	lzma_end(&strm);
+#endif
+}
+
+
+static void
 test_lzma_index_buffer_encode(void)
 {
 #if !defined(HAVE_ENCODERS) || !defined(HAVE_DECODERS)
@@ -1794,6 +1852,50 @@ test_decode_empty_and_append(void)
 }
 
 
+static void
+test_huge_number_of_records(void)
+{
+#ifndef HAVE_DECODERS
+	assert_skip("Decoder support disabled");
+#else
+	size_t in_size;
+	uint8_t *in = tuktest_file_from_srcdir(
+			"files/bad-0-index-1.xz", &in_size);
+	assert_uint_eq(in_size, 32);
+
+	lzma_index *i = NULL;
+
+	// When using the the public API of the multi-call decoder,
+	// we cannot inform it how big the Index may be at most.
+	// Thus, a huge value in Number of Records looks valid to it
+	// and we get LZMA_MEMLIMIT_ERROR.
+	lzma_stream strm = LZMA_STREAM_INIT;
+	assert_lzma_ret(lzma_index_decoder(&strm, &i, MEMLIMIT), LZMA_OK);
+	strm.next_in = in + LZMA_STREAM_HEADER_SIZE;
+	strm.avail_in = in_size - LZMA_STREAM_HEADER_SIZE;
+	assert_lzma_ret(lzma_code(&strm, LZMA_RUN), LZMA_MEMLIMIT_ERROR);
+	assert_uint(lzma_memusage(&strm), >, UINT64_C(100) << 30);
+	lzma_end(&strm);
+
+	// In contrast, lzma_index_buffer_decode() and
+	// lzma_file_info_decoder() know the input size. With these decoders,
+	// liblzma <= 5.8.3 returns LZMA_MEMLIMIT_ERROR because it doesn't
+	// sanity check the value in Number of Records against the input size.
+	uint64_t memlimit = MEMLIMIT;
+	size_t in_pos = LZMA_STREAM_HEADER_SIZE;
+	assert_lzma_ret(lzma_index_buffer_decode(&i, &memlimit, NULL,
+			in, &in_pos, in_size), LZMA_DATA_ERROR);
+
+	assert_lzma_ret(lzma_file_info_decoder(&strm, &i, MEMLIMIT, in_size),
+			LZMA_OK);
+	strm.next_in = in;
+	strm.avail_in = in_size;
+	assert_lzma_ret(lzma_code(&strm, LZMA_RUN), LZMA_DATA_ERROR);
+	lzma_end(&strm);
+#endif
+}
+
+
 extern int
 main(int argc, char **argv)
 {
@@ -1820,9 +1922,11 @@ main(int argc, char **argv)
 	tuktest_run(test_lzma_index_dup);
 	tuktest_run(test_lzma_index_encoder);
 	tuktest_run(test_lzma_index_decoder);
+	tuktest_run(test_lzma_index_decoder_memusage);
 	tuktest_run(test_lzma_index_buffer_encode);
 	tuktest_run(test_lzma_index_buffer_decode);
 	tuktest_run(test_decode_empty_and_append);
+	tuktest_run(test_huge_number_of_records);
 	lzma_index_end(decode_test_index, NULL);
 	return tuktest_end();
 }
