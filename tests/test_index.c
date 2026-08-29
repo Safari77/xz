@@ -42,6 +42,7 @@ test_lzma_index_memusage(void)
 
 	// The maximum number of Streams should be UINT32_MAX in the
 	// current implementation even though the parameter is lzma_vli.
+	assert_uint(lzma_index_memusage(UINT32_MAX, 1), <, UINT64_MAX / 8);
 	assert_uint_eq(lzma_index_memusage((lzma_vli)UINT32_MAX + 1, 1),
 			UINT64_MAX);
 
@@ -1319,6 +1320,13 @@ test_lzma_index_dup(void)
 	lzma_index *idx = lzma_index_init(NULL);
 	assert_true(idx != NULL);
 
+	lzma_stream_flags flags = {
+		.version = 0,
+		.backward_size = LZMA_BACKWARD_SIZE_MIN,
+		.check = LZMA_CHECK_CRC32,
+	};
+	assert_lzma_ret(lzma_index_stream_flags(idx, &flags), LZMA_OK);
+
 	// Test for the bug fix 21515d79d778b8730a434f151b07202d52a04611:
 	// liblzma: Fix lzma_index_dup() for empty Streams.
 	assert_lzma_ret(lzma_index_stream_padding(idx, 4), LZMA_OK);
@@ -1343,10 +1351,16 @@ test_lzma_index_dup(void)
 	lzma_index *second = lzma_index_init(NULL);
 	assert_true(second != NULL);
 
+	flags.check = LZMA_CHECK_CRC64;
+	assert_lzma_ret(lzma_index_stream_flags(second, &flags), LZMA_OK);
+
 	assert_lzma_ret(lzma_index_stream_padding(second, 16), LZMA_OK);
 
 	lzma_index *third = lzma_index_init(NULL);
 	assert_true(third != NULL);
+
+	flags.check = LZMA_CHECK_SHA256;
+	assert_lzma_ret(lzma_index_stream_flags(third, &flags), LZMA_OK);
 
 	assert_lzma_ret(lzma_index_append(third, NULL,
 			UNPADDED_SIZE_MIN * 10, 40), LZMA_OK);
@@ -1361,8 +1375,26 @@ test_lzma_index_dup(void)
 	copy = lzma_index_dup(idx, NULL);
 	assert_true(copy != NULL);
 	assert_true(index_is_equal(idx, copy));
+	assert_uint_eq(lzma_index_checks(copy), lzma_index_checks(idx));
 
-	lzma_index_end(copy, NULL);
+	const lzma_vli file_size = lzma_index_file_size(idx);
+	const lzma_vli uncomp_size = lzma_index_uncompressed_size(idx);
+	const lzma_vli block_count = lzma_index_block_count(idx);
+
+	assert_lzma_ret(lzma_index_append(copy, NULL, 11, 22), LZMA_OK);
+	assert_lzma_ret(lzma_index_cat(idx, copy, NULL), LZMA_OK);
+	assert_uint_eq(lzma_index_file_size(idx), 2 * file_size + 11 + 1 + 4);
+	assert_uint_eq(lzma_index_uncompressed_size(idx),
+			2 * uncomp_size + 22);
+	assert_uint_eq(lzma_index_block_count(idx), 2 * block_count + 1);
+
+	assert_lzma_ret(lzma_index_append(idx, NULL, 77, 99), LZMA_OK);
+	assert_uint_eq(lzma_index_file_size(idx),
+			2 * file_size + (11 + 1 + 4) + (77 + 3 + 0));
+	assert_uint_eq(lzma_index_uncompressed_size(idx),
+			2 * uncomp_size + 22 + 99);
+	assert_uint_eq(lzma_index_block_count(idx), 2 * block_count + 1 + 1);
+
 	lzma_index_end(idx, NULL);
 }
 
