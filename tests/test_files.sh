@@ -8,11 +8,12 @@
 ###############################################################################
 
 # Optional argument:
-# $1 = directory of the xz executable
+# $1 = directory of the xz and xzdec executables
 
 # If both xz and xzdec were not built, skip this test.
 XZ=${1:-../src/xz}/xz
-XZDEC=${2:-../src/xzdec}/xzdec
+XZDEC=${1:-../src/xzdec}/xzdec
+DECODE_BYTE_BY_BYTE=${1:-.}/decode_byte_by_byte
 test -x "$XZ" || XZ=
 test -x "$XZDEC" || XZDEC=
 if test -z "$XZ$XZDEC"; then
@@ -105,6 +106,8 @@ do
 		echo "Good file failed: $I"
 		exit 1
 	fi
+
+	"${DECODE_BYTE_BY_BYTE}" "$I" > /dev/null || exit 1
 done
 
 for I in "$srcdir"/files/bad-*.xz
@@ -185,6 +188,8 @@ do
 		echo "Good file failed: $I"
 		exit 1
 	fi
+
+	"${DECODE_BYTE_BY_BYTE}" "$I" > /dev/null || exit 1
 done
 
 for I in "$srcdir"/files/bad-*.lzma
@@ -209,6 +214,12 @@ if have_feature LZIP_DECODER ".lz files" ; then
 			echo "Good file failed: $I"
 			exit 1
 		fi
+
+		case $I in
+			*trailing*) ;;
+			*) "${DECODE_BYTE_BY_BYTE}" "$I" > /dev/null \
+					|| exit 1 ;;
+		esac
 	done
 
 	for I in "$srcdir"/files/bad-*.lz "$srcdir"/files/unsupported-*.lz

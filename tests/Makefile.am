@@ -75,6 +75,10 @@ TESTS = \
 	test_compress_generated_random \
 	test_compress_generated_text
 
+if COND_DECODER_LZMA1
+check_PROGRAMS += decode_byte_by_byte
+endif
+
 if COND_MICROLZMA
 check_PROGRAMS += test_microlzma
 TESTS += test_microlzma
@@ -86,4 +90,5 @@ endif
 
 clean-local:
 	-rm -f compress_generated_* \
-		xzgrep_test_output xzgrep_test_1.xz xzgrep_test_2.xz
+		xzgrep_test_output xzgrep_test_1.xz xzgrep_test_2.xz \
+		xzdiff_test xzdiff_test.xz xzdiff_test_z
